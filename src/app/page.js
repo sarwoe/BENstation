@@ -7,9 +7,18 @@ import PaymentModal from '../components/PaymentModal'
 import Head from 'next/head'
 import Link from 'next/link'
 
+const SAMPLE_PRODUCTS = [
+  { id: 1, name: 'Double Cheese Burger', category: 'Burger', price: 65000, stock: 15, image_url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=300&auto=format&fit=crop' },
+  { id: 2, name: 'Crispy Chicken Burger', category: 'Burger', price: 45000, stock: 20, image_url: 'https://images.unsplash.com/photo-1594179047519-f347310d3322?q=80&w=300&auto=format&fit=crop' },
+  { id: 3, name: 'Sausage Roll Deluxe', category: 'Snack', price: 35000, stock: 30, image_url: 'https://images.unsplash.com/photo-1621244301548-52292f75bd3b?q=80&w=300&auto=format&fit=crop' },
+  { id: 4, name: 'Supreme Pizza Large', category: 'Pizza', price: 125000, stock: 10, image_url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=300&auto=format&fit=crop' },
+  { id: 5, name: 'Vegetarian Pasta', category: 'Pasta', price: 55000, stock: 25, image_url: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?q=80&w=300&auto=format&fit=crop' },
+  { id: 6, name: 'Cola Float', category: 'Minuman', price: 20000, stock: 50, image_url: 'https://images.unsplash.com/photo-1581006852262-e4307cf6283a?q=80&w=300&auto=format&fit=crop' },
+];
+
 export default function Home() {
-  const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState(['All'])
+  const [products, setProducts] = useState(SAMPLE_PRODUCTS)
+  const [categories, setCategories] = useState(['All', 'Burger', 'Snack', 'Pizza', 'Pasta', 'Minuman'])
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
@@ -28,19 +37,25 @@ export default function Home() {
         supabase.from('categories').select('name')
       ])
       
-      if (productsRes.data) {
+      // Jika produk di Supabase ada isinya, gunakan data Supabase
+      if (productsRes.data && productsRes.data.length > 0) {
         setProducts(productsRes.data)
       }
 
+      // Gabungkan kategori dari tabel categories + produk
+      let allCats = []
       if (categoriesRes.data && categoriesRes.data.length > 0) {
-        const catNames = categoriesRes.data.map(c => c.name)
-        setCategories(['All', ...catNames])
-      } else if (productsRes.data) {
-        const unique = ['All', ...new Set(productsRes.data.map(item => item.category))]
-        setCategories(unique)
+        allCats = categoriesRes.data.map(c => c.name)
       }
+      
+      const currentProds = (productsRes.data && productsRes.data.length > 0) ? productsRes.data : SAMPLE_PRODUCTS
+      const prodCats = currentProds.map(item => item.category)
+      
+      const combined = ['All', ...new Set([...allCats, ...prodCats])]
+      setCategories(combined)
+
     } catch (err) {
-      console.error('Error fetching data:', err)
+      console.error('Fetch gagal, memakai data sample:', err)
     }
   }
 
@@ -121,7 +136,7 @@ export default function Home() {
           </main>
         </div>
 
-        {/* Panel Keranjang */}
+        {/* Panel Keranjang (Kanan di Desktop, Bawah di HP) */}
         <div className="w-full md:w-[420px] bg-white border-t md:border-t-0 md:border-l border-neutral-200 flex flex-col shadow-xl shrink-0 mt-6 md:mt-0">
           <div className="p-4 border-b border-neutral-100 flex justify-between items-center shrink-0">
             <h2 className="text-base font-extrabold text-neutral-900">Pesanan Aktif</h2>
@@ -170,7 +185,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Modal Navigasi Garis Tiga */}
+        {/* Modal Navigasi Garis Tiga (Drawer) */}
         {isMenuOpen && (
           <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
             <div className="w-72 bg-white h-full p-6 shadow-2xl flex flex-col justify-between">
