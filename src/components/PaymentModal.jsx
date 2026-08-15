@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient'
 import useCartStore from '../store/useCartStore'
 
 export default function PaymentModal({ isOpen, onClose, total }) {
-  const [paymentMethod, setPaymentMethod] = useState('CASH') // CASH, QRIS, TRANSFER
+  const [paymentMethod, setPaymentMethod] = useState('CASH')
   const [cash, setCash] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -25,7 +25,7 @@ export default function PaymentModal({ isOpen, onClose, total }) {
     setIsProcessing(true)
 
     try {
-      // Menyimpan transaksi ke Supabase
+      // 1. Simpan transaksi ke Supabase
       const { error } = await supabase.from('transactions').insert([
         {
           total_amount: total,
@@ -38,6 +38,16 @@ export default function PaymentModal({ isOpen, onClose, total }) {
         console.error('Error saving transaction:', error)
         alert('Gagal menyimpan riwayat: ' + error.message)
       } else {
+        // 2. Potong stok tiap produk yang dibeli
+        for (const item of cart) {
+          if (item.id && typeof item.stock === 'number') {
+            const newStock = Math.max(0, item.stock - item.quantity)
+            await supabase
+              .from('products')
+              .update({ stock: newStock })
+              .eq('id', item.id)
+          }
+        }
         setIsSuccess(true)
       }
     } catch (err) {
@@ -59,7 +69,6 @@ export default function PaymentModal({ isOpen, onClose, total }) {
           <>
             <h2 className="text-xl font-black text-neutral-900 mb-4">Metode Pembayaran</h2>
             
-            {/* Pilihan 3 Metode Pembayaran */}
             <div className="grid grid-cols-3 gap-2 mb-4">
               <button
                 type="button"
@@ -96,13 +105,11 @@ export default function PaymentModal({ isOpen, onClose, total }) {
               </button>
             </div>
 
-            {/* Total Tagihan */}
             <div className="bg-neutral-50 p-4 rounded-2xl mb-4 border border-neutral-100">
               <p className="text-xs text-neutral-500 font-bold uppercase">Total Tagihan</p>
               <p className="text-3xl font-black text-rose-600">Rp {total.toLocaleString('id-ID')}</p>
             </div>
 
-            {/* Konten Berdasarkan Metode */}
             {paymentMethod === 'CASH' && (
               <div className="mb-4">
                 <label className="text-xs font-bold text-neutral-700 block mb-1">Uang Diterima (Rp)</label>
@@ -127,8 +134,6 @@ export default function PaymentModal({ isOpen, onClose, total }) {
             {paymentMethod === 'QRIS' && (
               <div className="mb-4 p-4 bg-neutral-50 border border-neutral-200 rounded-2xl text-center">
                 <p className="text-xs font-bold text-neutral-700 mb-2">Scan QRIS untuk Membayar</p>
-                
-                {/* Gambar QR Code / Barcode Dummy (bisa diganti URL foto QRIS Anda nanti) */}
                 <div className="bg-white p-3 rounded-xl border inline-block shadow-sm mb-2">
                   <img 
                     src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=BENstation-QRIS" 
@@ -136,14 +141,13 @@ export default function PaymentModal({ isOpen, onClose, total }) {
                     className="w-40 h-40 mx-auto object-contain"
                   />
                 </div>
-                <p className="text-[11px] text-neutral-400 font-medium">Bisa di-scan menggunakan BCA, Mandiri, GoPay, OVO, Dana, dll.</p>
+                <p className="text-[11px] text-neutral-400 font-medium">BCA, Mandiri, GoPay, OVO, Dana, dll.</p>
               </div>
             )}
 
             {paymentMethod === 'TRANSFER' && (
               <div className="mb-4 p-4 bg-neutral-50 border border-neutral-200 rounded-2xl">
                 <p className="text-xs font-bold text-neutral-700 mb-3 text-center">Rekening Pembayaran</p>
-                
                 <div className="space-y-2 text-xs">
                   <div className="bg-white p-3 rounded-xl border flex justify-between items-center">
                     <div>
@@ -163,7 +167,6 @@ export default function PaymentModal({ isOpen, onClose, total }) {
               </div>
             )}
 
-            {/* Tombol Aksi */}
             <div className="flex gap-2">
               <button
                 onClick={onClose}
