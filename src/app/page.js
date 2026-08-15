@@ -1,127 +1,158 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { useCartStore } from '@/store/useCartStore'
-import PaymentModal from '@/components/PaymentModal'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import useCartStore from '../store/useCartStore'
+import PaymentModal from '../components/PaymentModal'
 
-export default function CashierPage() {
-  const [categories, setCategories] = useState([])
+export default function Home() {
   const [products, setProducts] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [loading, setLoading] = useState(true)
+  const [categories, setCategories] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('All')
+  const [search, setSearch] = useState('')
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
 
-  const { cart, addToCart, decreaseQty, getTotalPrice } = useCartStore()
+  const { cart, addToCart, removeFromCart, updateQuantity, clearCart, getTotal } = useCartStore()
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-      const { data: catData } = await supabase.from('categories').select('*')
-      const { data: prodData } = await supabase.from('products').select('*').eq('is_available', true)
-
-      if (catData) setCategories(catData)
-      if (prodData) setProducts(prodData)
-      setLoading(false)
-    }
-    fetchData()
+    fetchProducts()
   }, [])
 
-  const filteredProducts = selectedCategory === 'all'
-    ? products
-    : products.filter((p) => p.category_id === selectedCategory)
+  async function fetchProducts() {
+    const { data, error } = await supabase.from('products').select('*')
+    if (error) {
+      console.error('Error fetching products:', error)
+    } else {
+      setProducts(data || [])
+      const uniqueCategories = ['All', ...new Set(data.map((item) => item.category))]
+      setCategories(uniqueCategories)
+    }
+  }
+
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
+    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Panel Kiri: Katalog Menu BENstation */}
-      <div className="flex-1 flex flex-col p-6 overflow-hidden">
-        <header className="mb-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800 tracking-wide">BENstation POS</h1>
-          <span className="text-sm bg-green-100 text-green-800 font-semibold px-3 py-1 rounded-full">
-            Kasir Aktif
-          </span>
+    <div className="flex h-screen bg-gray-100 font-sans">
+      {/* Sidebar / Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Navbar */}
+        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">BENstation POS</h1>
+          <input
+            type="text"
+            placeholder="Cari produk..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border rounded-lg px-4 py-2 w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </header>
 
-        {/* Filter Kategori */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap ${
-              selectedCategory === 'all' ? 'bg-black text-white' : 'bg-white text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Semua Menu
-          </button>
+        {/* Categories Bar */}
+        <div className="bg-white border-b px-4 py-3 flex space-x-2 overflow-x-auto">
           {categories.map((cat) => (
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap ${
-                selectedCategory === cat.id ? 'bg-black text-white' : 'bg-white text-gray-700 hover:bg-gray-200'
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                selectedCategory === cat
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              {cat.name}
+              {cat}
             </button>
           ))}
         </div>
 
-        {/* Grid Produk */}
-        {loading ? (
-          <p className="text-gray-500">Memuat menu BENstation...</p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pr-2">
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition cursor-pointer flex flex-col justify-between border border-gray-100"
-              >
-                <div>
-                  <h3 className="font-semibold text-gray-800">{product.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Rp {Number(product.price).toLocaleString('id-ID')}
-                  </p>
+        {/* Product Grid */}
+        <main className="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredProducts.map((product) => (
+            <div
+              key={product.id}
+              onClick={() => addToCart(product)}
+              className="bg-white rounded-xl shadow p-4 flex flex-col justify-between cursor-pointer hover:shadow-lg transition border border-transparent hover:border-blue-500"
+            >
+              <div>
+                <div className="h-32 bg-gray-200 rounded-lg mb-3 flex items-center justify-center text-gray-400">
+                  {product.image_url ? (
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="h-full w-full object-cover rounded-lg"
+                    />
+                  ) : (
+                    <span>No Image</span>
+                  )}
                 </div>
-                <button className="mt-4 w-full bg-gray-900 text-white text-xs py-2 rounded-lg hover:bg-gray-800">
-                  + Tambah
-                </button>
+                <h3 className="font-semibold text-gray-800">{product.name}</h3>
+                <p className="text-xs text-gray-500">{product.category}</p>
               </div>
-            ))}
-          </div>
-        )}
+              <div className="mt-2 flex justify-between items-center">
+                <span className="font-bold text-blue-600">
+                  Rp {product.price?.toLocaleString('id-ID')}
+                </span>
+                <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                  Stok: {product.stock}
+                </span>
+              </div>
+            </div>
+          ))}
+        </main>
       </div>
 
-      {/* Panel Kanan: Ringkasan Keranjang */}
-      <div className="w-96 bg-white shadow-xl flex flex-col border-l border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="font-bold text-lg text-gray-800">Pesanan Baru</h2>
+      {/* Cart Sidebar */}
+      <div className="w-96 bg-white shadow-lg flex flex-col">
+        <div className="p-4 border-b flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-800">Keranjang</h2>
+          {cart.length > 0 && (
+            <button
+              onClick={clearCart}
+              className="text-xs text-red-500 hover:underline"
+            >
+              Kosongkan
+            </button>
+          )}
         </div>
 
-        <div className="flex-1 p-4 overflow-y-auto space-y-3">
+        {/* Cart Items List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {cart.length === 0 ? (
-            <p className="text-center text-gray-400 mt-10 text-sm">Keranjang masih kosong</p>
+            <div className="text-center text-gray-400 py-8">Keranjang masih kosong</div>
           ) : (
             cart.map((item) => (
-              <div key={item.id} className="flex justify-between items-center border-b pb-3">
-                <div>
+              <div
+                key={item.id}
+                className="flex items-center justify-between border-b pb-3"
+              >
+                <div className="flex-1">
                   <h4 className="font-medium text-sm text-gray-800">{item.name}</h4>
                   <p className="text-xs text-gray-500">
-                    Rp {Number(item.price * item.qty).toLocaleString('id-ID')}
+                    Rp {item.price?.toLocaleString('id-ID')}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => decreaseQty(item.id)}
-                    className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center font-bold text-xs"
+                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center text-sm"
                   >
                     -
                   </button>
-                  <span className="text-sm font-semibold">{item.qty}</span>
+                  <span className="text-sm font-semibold">{item.quantity}</span>
                   <button
-                    onClick={() => addToCart(item)}
-                    className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center font-bold text-xs"
+                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                    className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center text-sm"
                   >
                     +
+                  </button>
+                  <button
+                    onClick={() => removeFromCart(item.id)}
+                    className="text-red-500 hover:text-red-700 ml-2 text-xs"
+                  >
+                    ✕
                   </button>
                 </div>
               </div>
@@ -129,27 +160,31 @@ export default function CashierPage() {
           )}
         </div>
 
-        {/* Total & Tombol Bayar */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex justify-between font-bold text-base mb-4">
-            <span>Total:</span>
-            <span>Rp {getTotalPrice().toLocaleString('id-ID')}</span>
+        {/* Cart Summary & Checkout */}
+        <div className="p-4 border-t bg-gray-50">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-gray-600 font-medium">Total:</span>
+            <span className="text-2xl font-bold text-blue-600">
+              Rp {getTotal().toLocaleString('id-ID')}
+            </span>
           </div>
           <button
             disabled={cart.length === 0}
             onClick={() => setIsPaymentOpen(true)}
-            className="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 disabled:opacity-50 transition"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition"
           >
-            Lanjut Pembayaran
+            Bayar Sekarang
           </button>
         </div>
       </div>
 
-      {/* Pop-up Modal Pembayaran */}
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-      />
+      {/* Payment Modal */}
+      {isPaymentOpen && (
+        <PaymentModal
+          isOpen={isPaymentOpen}
+          onClose={() => setIsPaymentOpen(false)}
+        />
+      )}
     </div>
   )
 }
