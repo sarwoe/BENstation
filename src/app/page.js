@@ -8,7 +8,7 @@ import Head from 'next/head'
 
 export default function Home() {
   const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState(['All']) // Inisialisasi awal
+  const [categories, setCategories] = useState(['All'])
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
@@ -23,21 +23,15 @@ export default function Home() {
   async function fetchData() {
     setLoading(true)
     try {
-      // 1. Ambil data dari tabel products DAN tabel categories secara bersamaan
-      const [productsRes, categoriesRes] = await Promise.all([
-        supabase.from('products').select('*'),
-        supabase.from('categories').select('name')
-      ])
+      // Hanya ambil dari tabel 'products'
+      const { data, error } = await supabase.from('products').select('*')
       
-      const productsData = productsRes.data || []
-      const categoriesData = categoriesRes.data || []
-
-      setProducts(productsData)
-      
-      // 2. Set kategori dari tabel 'categories'
-      const catNames = categoriesData.map(c => c.name)
-      setCategories(['All', ...catNames])
-      
+      if (data) {
+        setProducts(data)
+        // Ambil kategori unik langsung dari data produk agar tidak error
+        const uniqueCategories = ['All', ...new Set(data.map(item => item.category))]
+        setCategories(uniqueCategories)
+      }
     } catch (err) {
       console.error('Error fetching data:', err)
     } finally {
@@ -47,36 +41,25 @@ export default function Home() {
 
   const filteredProducts = products.filter((product) => {
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
-    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = product.name?.toLowerCase().includes(search.toLowerCase())
     return matchesCategory && matchesSearch
   })
 
   return (
     <>
       <Head><title>BENstation</title></Head>
-
       <div className="flex flex-col md:flex-row h-screen bg-neutral-50 font-sans text-neutral-800">
         
-        {/* Main Content (Kiri) */}
+        {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="bg-white p-4 flex justify-between items-center border-b border-neutral-100 shrink-0">
             <h1 className="text-2xl font-extrabold text-neutral-950 tracking-tighter">BEN<span className='text-rose-600'>station</span></h1>
-            <input
-              type="text"
-              placeholder="Cari menu..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="border border-neutral-200 rounded-full px-4 py-2 w-40 md:w-60 focus:outline-none focus:ring-2 focus:ring-rose-300"
-            />
+            <input type="text" placeholder="Cari menu..." value={search} onChange={(e) => setSearch(e.target.value)} className="border border-neutral-200 rounded-full px-4 py-2 w-40 md:w-60 focus:outline-none focus:ring-2 focus:ring-rose-300"/>
           </header>
 
           <div className="bg-white border-b border-neutral-100 px-4 py-3 flex space-x-2 overflow-x-auto">
             {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap ${selectedCategory === cat ? 'bg-rose-600 text-white' : 'bg-neutral-100'}`}
-              >
+              <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap ${selectedCategory === cat ? 'bg-rose-600 text-white' : 'bg-neutral-100'}`}>
                 {cat}
               </button>
             ))}
@@ -97,44 +80,25 @@ export default function Home() {
           </main>
         </div>
 
-        {/* Cart Sidebar (Kanan) */}
+        {/* Cart */}
         <div className="w-full md:w-[420px] bg-white border-l border-neutral-100 flex flex-col shadow-xl shrink-0">
           <div className="p-4 border-b border-neutral-100 flex justify-between items-center">
             <h2 className="text-lg font-bold">Pesanan Aktif</h2>
             {cart.length > 0 && <button onClick={clearCart} className="text-xs text-neutral-400">Hapus Semua</button>}
           </div>
-
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {cart.length === 0 ? (
-              <div className="text-center text-neutral-400 py-10">Keranjang Kosong</div>
-            ) : (
-              cart.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 border-b pb-2">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold">{item.name}</p>
-                    <p className="text-xs text-rose-600">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 bg-neutral-100 rounded-full">-</button>
-                    <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-6 h-6 bg-rose-600 text-white rounded-full">+</button>
-                  </div>
-                </div>
-              ))
-            )}
+            {cart.length === 0 ? <div className="text-center text-neutral-400 py-10">Keranjang Kosong</div> : cart.map((item) => (
+              <div key={item.id} className="flex items-center gap-3 border-b pb-2">
+                <div className="flex-1"><p className="text-sm font-semibold">{item.name}</p><p className="text-xs text-rose-600">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</p></div>
+                <div className="flex items-center gap-2"><button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-6 h-6 bg-neutral-100 rounded-full">-</button><span className="text-sm font-bold w-4 text-center">{item.quantity}</span><button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-6 h-6 bg-rose-600 text-white rounded-full">+</button></div>
+              </div>
+            ))}
           </div>
-
           <div className="p-4 border-t bg-neutral-50">
-            <div className="flex justify-between items-center mb-4">
-              <span className="font-bold">Total:</span>
-              <span className="text-2xl font-extrabold text-rose-600">Rp {getTotal().toLocaleString('id-ID')}</span>
-            </div>
-            <button disabled={cart.length === 0} onClick={() => setIsPaymentOpen(true)} className="w-full bg-rose-600 text-white font-bold py-3 rounded-xl">
-              Bayar Sekarang
-            </button>
+            <div className="flex justify-between items-center mb-4"><span className="font-bold">Total:</span><span className="text-2xl font-extrabold text-rose-600">Rp {getTotal().toLocaleString('id-ID')}</span></div>
+            <button disabled={cart.length === 0} onClick={() => setIsPaymentOpen(true)} className="w-full bg-rose-600 text-white font-bold py-3 rounded-xl">Bayar Sekarang</button>
           </div>
         </div>
-
         {isPaymentOpen && <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />}
       </div>
     </>
