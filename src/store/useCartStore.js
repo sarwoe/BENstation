@@ -1,36 +1,37 @@
 import { create } from 'zustand'
 
-export const useCartStore = create((set, get) => ({
+const useCartStore = create((set, get) => ({
   cart: [],
   addToCart: (product) => {
-    const cart = get().cart
-    const existing = cart.find((item) => item.id === product.id)
-    if (existing) {
-      set({
-        cart: cart.map((item) =>
-          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
-        ),
-      })
+    const currentCart = get().cart
+    const existingIndex = currentCart.findIndex((item) => item.id === product.id)
+
+    if (existingIndex > -1) {
+      const updatedCart = [...currentCart]
+      updatedCart[existingIndex].quantity += 1
+      set({ cart: updatedCart })
     } else {
-      set({ cart: [...cart, { ...product, qty: 1 }] })
+      set({ cart: [...currentCart, { ...product, quantity: 1 }] })
     }
   },
-  decreaseQty: (id) => {
-    const cart = get().cart
-    const existing = cart.find((item) => item.id === id)
-    if (existing?.qty === 1) {
-      set({ cart: cart.filter((item) => item.id !== id) })
+  removeFromCart: (productId) => {
+    set({ cart: get().cart.filter((item) => item.id !== productId) })
+  },
+  updateQuantity: (productId, quantity) => {
+    if (quantity <= 0) {
+      get().removeFromCart(productId)
     } else {
       set({
-        cart: cart.map((item) =>
-          item.id === id ? { ...item, qty: item.qty - 1 } : item
+        cart: get().cart.map((item) =>
+          item.id === productId ? { ...item, quantity } : item
         ),
       })
     }
   },
-  removeFromCart: (id) =>
-    set({ cart: get().cart.filter((item) => item.id !== id) }),
   clearCart: () => set({ cart: [] }),
-  getTotalPrice: () =>
-    get().cart.reduce((sum, item) => sum + item.price * item.qty, 0),
+  getTotal: () => {
+    return get().cart.reduce((total, item) => total + item.price * item.quantity, 0)
+  },
 }))
+
+export default useCartStore
