@@ -49,11 +49,13 @@ export default function Home() {
   return (
     <>
       <Head><title>BENstation</title></Head>
-      <div className="flex flex-col md:flex-row h-screen bg-neutral-50 font-sans text-neutral-800 overflow-hidden">
+      
+      {/* Container Utama: Di HP scroll normal (min-h-screen), di Desktop terkunci rapi (md:h-screen md:overflow-hidden) */}
+      <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-neutral-50 font-sans text-neutral-800 md:overflow-hidden">
         
-        {/* Area Utama (Kiri) */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="bg-white p-4 flex justify-between items-center border-b border-neutral-100 shrink-0">
+        {/* Area Utama (Menu) */}
+        <div className="flex-1 flex flex-col md:overflow-hidden">
+          <header className="bg-white p-4 flex justify-between items-center border-b border-neutral-100 shrink-0 sticky top-0 z-10 md:relative">
             <h1 className="text-2xl font-extrabold text-neutral-950 tracking-tighter">BEN<span className='text-rose-600'>station</span></h1>
             <input
               type="text"
@@ -64,7 +66,7 @@ export default function Home() {
             />
           </header>
 
-          <div className="bg-white border-b border-neutral-100 px-4 py-3 flex space-x-2 overflow-x-auto shrink-0">
+          <div className="bg-white border-b border-neutral-100 px-4 py-3 flex space-x-2 overflow-x-auto shrink-0 sticky top-[65px] z-10 md:relative md:top-0">
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -78,7 +80,7 @@ export default function Home() {
             ))}
           </div>
 
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-neutral-50">
+          <main className="flex-1 md:overflow-y-auto p-4 md:p-6 bg-neutral-50">
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredProducts.map((product) => (
                 <div
@@ -105,8 +107,8 @@ export default function Home() {
           </main>
         </div>
 
-        {/* Panel Keranjang (Kanan di Desktop, Bawah di HP) */}
-        <div className="w-full md:w-[420px] bg-white border-l border-neutral-100 flex flex-col shadow-xl shrink-0 h-[400px] md:h-full">
+        {/* Panel Keranjang (Di HP berada pas di bawah menu, di Desktop menempel di sebelah kanan) */}
+        <div className="w-full md:w-[420px] bg-white border-t md:border-t-0 md:border-l border-neutral-200 flex flex-col shadow-xl shrink-0 mt-6 md:mt-0">
           <div className="p-4 border-b border-neutral-100 flex justify-between items-center shrink-0">
             <h2 className="text-base font-extrabold text-neutral-900">Pesanan Aktif</h2>
             {cart.length > 0 && (
@@ -114,9 +116,9 @@ export default function Home() {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[180px] md:min-h-0">
             {cart.length === 0 ? (
-              <div className="text-center text-neutral-400 py-12">
+              <div className="text-center text-neutral-400 py-10">
                 <p className="text-sm font-semibold">Keranjang Kosong</p>
                 <p className="text-xs text-neutral-300 mt-1">Klik menu untuk menambahkan</p>
               </div>
@@ -139,7 +141,7 @@ export default function Home() {
             )}
           </div>
 
-          <div className="p-4 border-t border-neutral-100 bg-neutral-50/50 shrink-0">
+          <div className="p-4 border-t border-neutral-100 bg-neutral-50/50 shrink-0 sticky bottom-0 md:relative">
             <div className="flex justify-between items-center mb-4">
               <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Total Tagihan:</span>
               <span className="text-2xl font-black text-rose-600">Rp {getTotal().toLocaleString('id-ID')}</span>
