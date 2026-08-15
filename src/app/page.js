@@ -6,18 +6,9 @@ import useCartStore from '../store/useCartStore'
 import PaymentModal from '../components/PaymentModal'
 import Head from 'next/head'
 
-const SAMPLE_PRODUCTS = [
-  { id: 1, name: 'Double Cheese Burger', category: 'Burger', price: 65000, stock: 15, image_url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=300&auto=format&fit=crop' },
-  { id: 2, name: 'Crispy Chicken Burger', category: 'Burger', price: 45000, stock: 20, image_url: 'https://images.unsplash.com/photo-1594179047519-f347310d3322?q=80&w=300&auto=format&fit=crop' },
-  { id: 3, name: 'Sausage Roll Deluxe', category: 'Snack', price: 35000, stock: 30, image_url: 'https://images.unsplash.com/photo-1621244301548-52292f75bd3b?q=80&w=300&auto=format&fit=crop' },
-  { id: 4, name: 'Supreme Pizza Large', category: 'Pizza', price: 125000, stock: 10, image_url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=300&auto=format&fit=crop' },
-  { id: 5, name: 'Vegetarian Pasta', category: 'Pasta', price: 55000, stock: 25, image_url: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?q=80&w=300&auto=format&fit=crop' },
-  { id: 6, name: 'Cola Float', category: 'Minuman', price: 20000, stock: 50, image_url: 'https://images.unsplash.com/photo-1581006852262-e4307cf6283a?q=80&w=300&auto=format&fit=crop' },
-];
-
 export default function Home() {
   const [products, setProducts] = useState([])
-  const [categories, setCategories] = useState([])
+  const [categories, setCategories] = useState(['All']) // Inisialisasi awal
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
@@ -32,21 +23,26 @@ export default function Home() {
   async function fetchData() {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from('products').select('*')
-      if (error) setupData(SAMPLE_PRODUCTS)
-      else if (data && data.length > 0) setupData(data)
-      else setupData(SAMPLE_PRODUCTS)
+      // 1. Ambil data dari tabel products DAN tabel categories secara bersamaan
+      const [productsRes, categoriesRes] = await Promise.all([
+        supabase.from('products').select('*'),
+        supabase.from('categories').select('name')
+      ])
+      
+      const productsData = productsRes.data || []
+      const categoriesData = categoriesRes.data || []
+
+      setProducts(productsData)
+      
+      // 2. Set kategori dari tabel 'categories'
+      const catNames = categoriesData.map(c => c.name)
+      setCategories(['All', ...catNames])
+      
     } catch (err) {
-      setupData(SAMPLE_PRODUCTS)
+      console.error('Error fetching data:', err)
     } finally {
       setLoading(false)
     }
-  }
-
-  function setupData(data) {
-    setProducts(data || [])
-    const uniqueCategories = ['All', ...new Set(data.map((item) => item.category))]
-    setCategories(uniqueCategories)
   }
 
   const filteredProducts = products.filter((product) => {
@@ -59,7 +55,6 @@ export default function Home() {
     <>
       <Head><title>BENstation</title></Head>
 
-      {/* Wrapper utama: flex-col di HP, flex-row di Desktop (md) */}
       <div className="flex flex-col md:flex-row h-screen bg-neutral-50 font-sans text-neutral-800">
         
         {/* Main Content (Kiri) */}
@@ -103,7 +98,6 @@ export default function Home() {
         </div>
 
         {/* Cart Sidebar (Kanan) */}
-        {/* Di HP lebarnya penuh, di Desktop lebarnya 420px */}
         <div className="w-full md:w-[420px] bg-white border-l border-neutral-100 flex flex-col shadow-xl shrink-0">
           <div className="p-4 border-b border-neutral-100 flex justify-between items-center">
             <h2 className="text-lg font-bold">Pesanan Aktif</h2>
