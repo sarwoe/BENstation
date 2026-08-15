@@ -6,18 +6,9 @@ import useCartStore from '../store/useCartStore'
 import PaymentModal from '../components/PaymentModal'
 import Link from 'next/link'
 
-const SAMPLE_PRODUCTS = [
-  { id: 1, name: 'Double Cheese Burger', category: 'Burger', price: 65000, stock: 15, image_url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=300&auto=format&fit=crop' },
-  { id: 2, name: 'Crispy Chicken Burger', category: 'Burger', price: 45000, stock: 20, image_url: 'https://images.unsplash.com/photo-1594179047519-f347310d3322?q=80&w=300&auto=format&fit=crop' },
-  { id: 3, name: 'Sausage Roll Deluxe', category: 'Snack', price: 35000, stock: 30, image_url: 'https://images.unsplash.com/photo-1621244301548-52292f75bd3b?q=80&w=300&auto=format&fit=crop' },
-  { id: 4, name: 'Supreme Pizza Large', category: 'Pizza', price: 125000, stock: 10, image_url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?q=80&w=300&auto=format&fit=crop' },
-  { id: 5, name: 'Vegetarian Pasta', category: 'Pasta', price: 55000, stock: 25, image_url: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?q=80&w=300&auto=format&fit=crop' },
-  { id: 6, name: 'Cola Float', category: 'Minuman', price: 20000, stock: 50, image_url: 'https://images.unsplash.com/photo-1581006852262-e4307cf6283a?q=80&w=300&auto=format&fit=crop' },
-];
-
 export default function Home() {
-  const [products, setProducts] = useState(SAMPLE_PRODUCTS)
-  const [categories, setCategories] = useState(['All', 'Burger', 'Snack', 'Pizza', 'Pasta', 'Minuman'])
+  const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState(['All'])
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
@@ -57,6 +48,15 @@ export default function Home() {
     const matchesSearch = product.name?.toLowerCase().includes(search.toLowerCase())
     return matchesCategory && matchesSearch
   })
+
+  // Proteksi utama: Tolak jika stok <= 0
+  const handleAddToCart = (product) => {
+    if (product.stock <= 0) {
+      alert(`Menu "${product.name}" stoknya sedang habis dan tidak bisa dibeli!`)
+      return
+    }
+    addToCart(product)
+  }
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-neutral-50 font-sans text-neutral-800 md:overflow-hidden">
@@ -101,27 +101,57 @@ export default function Home() {
 
         <main className="flex-1 md:overflow-y-auto p-4 md:p-6 bg-neutral-50">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                onClick={() => addToCart(product)}
-                className="bg-white rounded-2xl shadow-sm p-3 cursor-pointer hover:border-rose-300 border border-neutral-100 transition group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="h-32 bg-neutral-100 rounded-xl mb-3 overflow-hidden">
-                    {product.image_url && (
-                      <img src={product.image_url} alt={product.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
-                    )}
+            {filteredProducts.map((product) => {
+              const isOutOfStock = product.stock <= 0
+
+              return (
+                <div
+                  key={product.id}
+                  onClick={() => handleAddToCart(product)}
+                  className={`bg-white rounded-2xl p-3 border transition flex flex-col justify-between ${
+                    isOutOfStock 
+                      ? 'opacity-50 cursor-not-allowed border-neutral-200 bg-neutral-100/60' 
+                      : 'border-neutral-100 shadow-sm cursor-pointer hover:border-rose-300 group'
+                  }`}
+                >
+                  <div>
+                    <div className="h-32 bg-neutral-100 rounded-xl mb-3 overflow-hidden relative">
+                      {product.image_url ? (
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name} 
+                          className={`h-full w-full object-cover transition duration-300 ${isOutOfStock ? 'grayscale' : 'group-hover:scale-105'}`}
+                          onError={(e) => { e.target.style.display = 'none' }} 
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-3xl">🍽️</div>
+                      )}
+
+                      {/* Label Stok Habis */}
+                      {isOutOfStock && (
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+                          <span className="bg-rose-600 text-white text-[11px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-md">
+                            Stok Habis
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <h3 className="font-bold text-sm text-neutral-900 truncate leading-snug">{product.name}</h3>
+                    <p className="text-[10px] text-rose-500 font-bold uppercase tracking-wider mt-0.5">{product.category}</p>
                   </div>
-                  <h3 className="font-bold text-sm text-neutral-900 truncate leading-snug">{product.name}</h3>
-                  <p className="text-[10px] text-rose-500 font-bold uppercase tracking-wider mt-0.5">{product.category}</p>
+
+                  <div className="mt-3 pt-2 border-t border-neutral-100 flex justify-between items-center">
+                    <span className="font-extrabold text-rose-600 text-sm">Rp {product.price?.toLocaleString('id-ID')}</span>
+                    <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${
+                      isOutOfStock ? 'bg-rose-100 text-rose-600' : 'bg-neutral-100 text-neutral-500'
+                    }`}>
+                      {isOutOfStock ? 'Stok 0' : `Stok ${product.stock}`}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-3 pt-2 border-t border-neutral-100 flex justify-between items-center">
-                  <span className="font-extrabold text-rose-600 text-sm">Rp {product.price?.toLocaleString('id-ID')}</span>
-                  <span className="text-[10px] bg-neutral-100 px-2 py-1 rounded-full text-neutral-500 font-bold">Stok {product.stock}</span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </main>
       </div>
