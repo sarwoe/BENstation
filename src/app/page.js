@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient'
 import useCartStore from '../store/useCartStore'
 import PaymentModal from '../components/PaymentModal'
 import Head from 'next/head'
+import Link from 'next/link'
 
 const SAMPLE_PRODUCTS = [
   { id: 1, name: 'Double Cheese Burger', category: 'Burger', price: 65000, stock: 15, image_url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=300&auto=format&fit=crop' },
@@ -21,24 +22,26 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const { cart, addToCart, updateQuantity, clearCart, getTotal } = useCartStore()
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const { data, error } = await supabase.from('products').select('*')
-        if (data && data.length > 0) {
-          setProducts(data)
-          const uniqueCategories = ['All', ...new Set(data.map(item => item.category))]
-          setCategories(uniqueCategories)
-        }
-      } catch (err) {
-        console.error('Supabase fetch failed, using sample data:', err)
-      }
-    }
     fetchData()
   }, [])
+
+  async function fetchData() {
+    try {
+      const { data, error } = await supabase.from('products').select('*')
+      if (data && data.length > 0) {
+        setProducts(data)
+        const uniqueCategories = ['All', ...new Set(data.map(item => item.category))]
+        setCategories(uniqueCategories)
+      }
+    } catch (err) {
+      console.error('Supabase fetch failed, using sample data:', err)
+    }
+  }
 
   const filteredProducts = products.filter((product) => {
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
@@ -50,20 +53,31 @@ export default function Home() {
     <>
       <Head><title>BENstation</title></Head>
       
-      {/* Container Utama: Di HP scroll normal (min-h-screen), di Desktop terkunci rapi (md:h-screen md:overflow-hidden) */}
       <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-neutral-50 font-sans text-neutral-800 md:overflow-hidden">
         
         {/* Area Utama (Menu) */}
         <div className="flex-1 flex flex-col md:overflow-hidden">
           <header className="bg-white p-4 flex justify-between items-center border-b border-neutral-100 shrink-0 sticky top-0 z-10 md:relative">
             <h1 className="text-2xl font-extrabold text-neutral-950 tracking-tighter">BEN<span className='text-rose-600'>station</span></h1>
-            <input
-              type="text"
-              placeholder="Cari menu..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="border border-neutral-200 rounded-full px-4 py-2 w-40 md:w-60 focus:outline-none focus:ring-2 focus:ring-rose-300 text-sm"
-            />
+            
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Cari menu..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="border border-neutral-200 rounded-full px-4 py-2 w-36 md:w-60 focus:outline-none focus:ring-2 focus:ring-rose-300 text-sm"
+              />
+              {/* Tombol Garis Tiga (Hamburger Menu) */}
+              <button 
+                onClick={() => setIsMenuOpen(true)}
+                className="p-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 transition"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
           </header>
 
           <div className="bg-white border-b border-neutral-100 px-4 py-3 flex space-x-2 overflow-x-auto shrink-0 sticky top-[65px] z-10 md:relative md:top-0">
@@ -107,7 +121,7 @@ export default function Home() {
           </main>
         </div>
 
-        {/* Panel Keranjang (Di HP berada pas di bawah menu, di Desktop menempel di sebelah kanan) */}
+        {/* Panel Keranjang (Di HP di bawah, di Desktop di kanan) */}
         <div className="w-full md:w-[420px] bg-white border-t md:border-t-0 md:border-l border-neutral-200 flex flex-col shadow-xl shrink-0 mt-6 md:mt-0">
           <div className="p-4 border-b border-neutral-100 flex justify-between items-center shrink-0">
             <h2 className="text-base font-extrabold text-neutral-900">Pesanan Aktif</h2>
@@ -155,6 +169,36 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+        {/* Modal Navigasi Garis Tiga (Drawer) */}
+        {isMenuOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
+            <div className="w-72 bg-white h-full p-6 shadow-2xl flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-8 border-b pb-4">
+                  <h2 className="font-extrabold text-lg text-neutral-900">Menu Pengaturan</h2>
+                  <button onClick={() => setIsMenuOpen(false)} className="text-neutral-400 font-bold hover:text-rose-600">✕</button>
+                </div>
+                
+                <nav className="space-y-3">
+                  <Link href="/history" className="flex items-center gap-3 p-3 rounded-xl hover:bg-rose-50 hover:text-rose-600 font-bold text-neutral-700 transition">
+                    <span>📜</span> Riwayat Pembelian
+                  </Link>
+                  <Link href="/manage-menu" className="flex items-center gap-3 p-3 rounded-xl hover:bg-rose-50 hover:text-rose-600 font-bold text-neutral-700 transition">
+                    <span>🍔</span> Update & Tambah Menu
+                  </Link>
+                  <Link href="/manage-categories" className="flex items-center gap-3 p-3 rounded-xl hover:bg-rose-50 hover:text-rose-600 font-bold text-neutral-700 transition">
+                    <span>🏷️</span> Update Kategori
+                  </Link>
+                </nav>
+              </div>
+
+              <div className="text-xs text-neutral-400 border-t pt-4 text-center">
+                BENstation POS v2.0
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal Pembayaran */}
         {isPaymentOpen && (
