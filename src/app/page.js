@@ -23,11 +23,11 @@ export default function Home() {
   async function fetchData() {
     try {
       const [productsRes, categoriesRes] = await Promise.all([
-        supabase.from('products').select('*'),
+        supabase.from('products').select('*').order('id', { ascending: false }),
         supabase.from('categories').select('*')
       ])
       
-      if (productsRes.data && productsRes.data.length > 0) {
+      if (productsRes.data) {
         setProducts(productsRes.data)
       }
 
@@ -43,16 +43,21 @@ export default function Home() {
     }
   }
 
+  const handleClosePayment = () => {
+    setIsPaymentOpen(false)
+    fetchData() // Refresh stok produk dari database secara real-time setelah pembayaran
+  }
+
   const filteredProducts = products.filter((product) => {
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
     const matchesSearch = product.name?.toLowerCase().includes(search.toLowerCase())
     return matchesCategory && matchesSearch
   })
 
-  // Proteksi utama: Tolak jika stok <= 0
   const handleAddToCart = (product) => {
-    if (product.stock <= 0) {
-      alert(`Menu "${product.name}" stoknya sedang habis dan tidak bisa dibeli!`)
+    const stockNum = Number(product.stock) || 0
+    if (stockNum <= 0) {
+      alert(`Stok menu "${product.name}" sudah habis!`)
       return
     }
     addToCart(product)
@@ -102,13 +107,14 @@ export default function Home() {
         <main className="flex-1 md:overflow-y-auto p-4 md:p-6 bg-neutral-50">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProducts.map((product) => {
-              const isOutOfStock = product.stock <= 0
+              const stockNum = Number(product.stock) || 0
+              const isOutOfStock = stockNum <= 0
 
               return (
                 <div
                   key={product.id}
-                  onClick={() => handleAddToCart(product)}
-                  className={`bg-white rounded-2xl p-3 border transition flex flex-col justify-between ${
+                  onClick={() => !isOutOfStock && handleAddToCart(product)}
+                  className={`bg-white rounded-2xl p-3 border transition flex flex-col justify-between select-none ${
                     isOutOfStock 
                       ? 'opacity-50 cursor-not-allowed border-neutral-200 bg-neutral-100/60' 
                       : 'border-neutral-100 shadow-sm cursor-pointer hover:border-rose-300 group'
@@ -127,7 +133,6 @@ export default function Home() {
                         <div className="w-full h-full flex items-center justify-center text-3xl">🍽️</div>
                       )}
 
-                      {/* Label Stok Habis */}
                       {isOutOfStock && (
                         <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
                           <span className="bg-rose-600 text-white text-[11px] font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-md">
@@ -146,7 +151,7 @@ export default function Home() {
                     <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${
                       isOutOfStock ? 'bg-rose-100 text-rose-600' : 'bg-neutral-100 text-neutral-500'
                     }`}>
-                      {isOutOfStock ? 'Stok 0' : `Stok ${product.stock}`}
+                      {isOutOfStock ? 'Stok 0' : `Stok ${stockNum}`}
                     </span>
                   </div>
                 </div>
@@ -239,7 +244,7 @@ export default function Home() {
       {isPaymentOpen && (
         <PaymentModal
           isOpen={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
+          onClose={handleClosePayment}
           total={getTotal()}
         />
       )}
