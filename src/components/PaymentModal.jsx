@@ -24,7 +24,7 @@ export default function PaymentModal({ isOpen, onClose, total }) {
     setIsProcessing(true)
 
     try {
-      // Simpan transaksi ke database Supabase
+      // Menyimpan transaksi ke database Supabase
       const { error } = await supabase.from('transactions').insert([
         {
           total_amount: total,
