@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useCartStore } from '@/store/useCartStore'
+import PaymentModal from '@/components/PaymentModal'
 
 export default function CashierPage() {
   const [categories, setCategories] = useState([])
   const [products, setProducts] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false)
 
   const { cart, addToCart, decreaseQty, getTotalPrice } = useCartStore()
 
@@ -127,7 +129,7 @@ export default function CashierPage() {
           )}
         </div>
 
-        {/* Total Belanja */}
+        {/* Total & Tombol Bayar */}
         <div className="p-4 border-t border-gray-200 bg-gray-50">
           <div className="flex justify-between font-bold text-base mb-4">
             <span>Total:</span>
@@ -135,12 +137,19 @@ export default function CashierPage() {
           </div>
           <button
             disabled={cart.length === 0}
+            onClick={() => setIsPaymentOpen(true)}
             className="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 disabled:opacity-50 transition"
           >
             Lanjut Pembayaran
           </button>
         </div>
       </div>
+
+      {/* Pop-up Modal Pembayaran */}
+      <PaymentModal
+        isOpen={isPaymentOpen}
+        onClose={() => setIsPaymentOpen(false)}
+      />
     </div>
   )
 }
