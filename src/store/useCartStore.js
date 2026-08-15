@@ -4,14 +4,17 @@ const useCartStore = create((set, get) => ({
   cart: [],
 
   addToCart: (product) => {
-    if (product.stock <= 0) return
+    const stockNum = Number(product.stock) || 0
+    if (stockNum <= 0) {
+      alert(`Stok "${product.name}" habis!`)
+      return
+    }
 
     set((state) => {
       const existing = state.cart.find((item) => item.id === product.id)
       if (existing) {
-        // Cek jika kuantitas di keranjang sudah mencapai stok maksimum
-        if (existing.quantity >= product.stock) {
-          alert(`Jumlah pesanan sudah mencapai stok maksimum (${product.stock})`)
+        if (existing.quantity >= stockNum) {
+          alert(`Pesanan "${product.name}" sudah mencapai batas maksimum stok (${stockNum})`)
           return state
         }
         return {
@@ -22,7 +25,7 @@ const useCartStore = create((set, get) => ({
           ),
         }
       }
-      return { cart: [...state.cart, { ...product, quantity: 1 }] }
+      return { cart: [...state.cart, { ...product, quantity: 1, stock: stockNum }] }
     })
   },
 
@@ -31,9 +34,10 @@ const useCartStore = create((set, get) => ({
       const item = state.cart.find((i) => i.id === id)
       if (!item) return state
 
-      // Jika mencoba menambah melebihi stok
-      if (newQuantity > item.stock) {
-        alert(`Jumlah pesanan tidak boleh melebihi stok yang tersedia (${item.stock})`)
+      const stockNum = Number(item.stock) || 0
+
+      if (newQuantity > stockNum) {
+        alert(`Jumlah pesanan tidak boleh melebihi stok yang tersedia (${stockNum})`)
         return state
       }
 
