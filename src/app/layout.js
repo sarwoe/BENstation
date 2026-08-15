@@ -1,8 +1,8 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'BENstation POS',
-  description: 'Sistem Kasir BENstation',
+  title: 'BENstation',
+  description: 'Aplikasi Kasir BENstation',
 }
 
 export default function RootLayout({ children }) {
@@ -12,4 +12,3 @@ export default function RootLayout({ children }) {
     </html>
   )
 }
-
