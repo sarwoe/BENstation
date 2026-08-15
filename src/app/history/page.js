@@ -63,7 +63,6 @@ export default function HistoryPage() {
                   </div>
                 </div>
 
-                {/* Tampilkan detail pesanan jika ada */}
                 {Array.isArray(t.items) && t.items.length > 0 && (
                   <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-100 text-xs text-neutral-600 space-y-1 mt-1">
                     {t.items.map((item, idx) => (
