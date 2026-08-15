@@ -1,178 +1,150 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { useCartStore } from '@/store/useCartStore'
-import { useReactToPrint } from 'react-to-print'
+import { useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import useCartStore from '../store/useCartStore'
 
 export default function PaymentModal({ isOpen, onClose }) {
-  const { cart, getTotalPrice, clearCart } = useCartStore()
-  const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [amountPaid, setAmountPaid] = useState('')
-  const [completedOrder, setCompletedOrder] = useState(null)
-  const [loading, setLoading] = useState(false)
-
-  const printRef = useRef(null)
-  const handlePrint = useReactToPrint({ contentRef: printRef })
+  const { cart, getTotal, clearCart } = useCartStore()
+  const [paymentMethod, setPaymentMethod] = useState('Cash')
+  const [cashAmount, setCashAmount] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
 
   if (!isOpen) return null
 
-  const total = getTotalPrice()
-  const paidNumber = Number(amountPaid) || 0
-  const change = paidNumber - total
+  const total = getTotal()
+  const change = Number(cashAmount) - total
 
-  const handleProcessPayment = async () => {
-    if (paymentMethod === 'cash' && paidNumber < total) {
+  async function handleCheckout() {
+    if (paymentMethod === 'Cash' && change < 0) {
       alert('Uang pembayaran kurang!')
       return
     }
 
-    setLoading(true)
+    setIsProcessing(true)
+
     try {
-      const { data, error } = await supabase
-        .from('orders')
+      // 1. Catat Transaksi Utama
+      const { data: transaction, error: transError } = await supabase
+        .from('transactions')
         .insert([
           {
-            payment_method: paymentMethod,
             total_amount: total,
-            amount_paid: paymentMethod === 'qris' ? total : paidNumber,
-            change_amount: paymentMethod === 'qris' ? 0 : change,
-            items: cart,
+            payment_method: paymentMethod,
+            cash_given: paymentMethod === 'Cash' ? Number(cashAmount) : total,
+            change_given: paymentMethod === 'Cash' ? change : 0,
           },
         ])
         .select()
+        .single()
 
-      if (error) throw error
+      if (transError) throw transError
 
-      setCompletedOrder(data[0])
+      // 2. Catat Detail Barang yang Dibeli
+      const transactionItems = cart.map((item) => ({
+        transaction_id: transaction.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+      }))
+
+      const { error: itemsError } = await supabase
+        .from('transaction_items')
+        .insert(transactionItems)
+
+      if (itemsError) throw itemsError
+
+      // 3. Potong Stok Produk di Database
+      for (const item of cart) {
+        await supabase
+          .from('products')
+          .update({ stock: item.stock - item.quantity })
+          .eq('id', item.id)
+      }
+
+      alert('Transaksi Berhasil!')
+      clearCart()
+      onClose()
+      window.location.reload()
     } catch (err) {
+      console.error(err)
       alert('Gagal memproses transaksi: ' + err.message)
     } finally {
-      setLoading(false)
+      setIsProcessing(false)
     }
   }
 
-  const handleFinish = () => {
-    clearCart()
-    setCompletedOrder(null)
-    setAmountPaid('')
-    onClose()
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-        {!completedOrder ? (
-          <>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Pembayaran BENstation</h2>
-            
-            <div className="flex gap-2 mb-4">
+        <h3 className="text-xl font-bold mb-4 text-gray-800">Pembayaran</h3>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-600 mb-1">Total Tagihan</label>
+          <div className="text-3xl font-bold text-blue-600">Rp {total.toLocaleString('id-ID')}</div>
+        </div>
+
+        {/* Metode Pembayaran */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-600 mb-2">Metode Pembayaran</label>
+          <div className="grid grid-cols-3 gap-2">
+            {['Cash', 'QRIS', 'Transfer'].map((method) => (
               <button
-                onClick={() => setPaymentMethod('cash')}
-                className={`flex-1 py-2 font-semibold rounded-lg border ${
-                  paymentMethod === 'cash' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-700'
+                key={method}
+                type="button"
+                onClick={() => setPaymentMethod(method)}
+                className={`py-2 text-sm font-semibold rounded-lg border transition ${
+                  paymentMethod === method
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                 }`}
               >
-                Cash (Tunai)
+                {method}
               </button>
-              <button
-                onClick={() => setPaymentMethod('qris')}
-                className={`flex-1 py-2 font-semibold rounded-lg border ${
-                  paymentMethod === 'qris' ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-700'
-                }`}
-              >
-                QRIS
-              </button>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            <div className="bg-gray-100 p-4 rounded-xl mb-4 text-center">
-              <p className="text-xs text-gray-500 uppercase font-semibold">Total Tagihan</p>
-              <p className="text-2xl font-bold text-gray-800">Rp {total.toLocaleString('id-ID')}</p>
-            </div>
-
-            {paymentMethod === 'cash' ? (
-              <div className="space-y-3 mb-6">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600">Uang Diterima (Rp)</label>
-                  <input
-                    type="number"
-                    value={amountPaid}
-                    onChange={(e) => setAmountPaid(e.target.value)}
-                    placeholder="Contoh: 50000"
-                    className="w-full mt-1 p-3 border rounded-xl text-lg font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-black"
-                  />
-                </div>
-                {paidNumber >= total && (
-                  <div className="flex justify-between text-sm font-semibold text-green-700">
-                    <span>Kembalian:</span>
-                    <span>Rp {change.toLocaleString('id-ID')}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center my-4 p-4 border rounded-xl bg-gray-50">
-                <p className="text-sm font-medium text-gray-700 mb-2">Scan QRIS BENstation</p>
-                <div className="w-40 h-40 bg-gray-200 mx-auto flex items-center justify-center text-xs text-gray-500 rounded-lg">
-                  [ Gambar QRIS ]
-                </div>
+        {/* Input Cash */}
+        {paymentMethod === 'Cash' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-600 mb-1">Uang Diterima</label>
+            <input
+              type="number"
+              placeholder="0"
+              value={cashAmount}
+              onChange={(e) => setCashAmount(e.target.value)}
+              className="w-full border rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {cashAmount && (
+              <div className="mt-2 text-sm">
+                Kembalian:{' '}
+                <span className={`font-bold ${change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  Rp {change.toLocaleString('id-ID')}
+                </span>
               </div>
             )}
-
-            <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 py-3 text-gray-600 font-semibold rounded-xl bg-gray-100">
-                Batal
-              </button>
-              <button
-                onClick={handleProcessPayment}
-                disabled={loading}
-                className="flex-1 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 disabled:opacity-50"
-              >
-                {loading ? 'Memproses...' : 'Selesaikan'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="text-center">
-            <h3 className="text-lg font-bold text-green-600 mb-1">Transaksi Berhasil!</h3>
-            <p className="text-xs text-gray-500 mb-4">No Nota: #{completedOrder.order_number}</p>
-
-            {/* Template Struk */}
-            <div ref={printRef} className="p-4 bg-gray-50 rounded-lg border text-left text-xs font-mono mb-4">
-              <div className="text-center mb-2 font-bold text-sm">BENstation</div>
-              <p>Tgl: {new Date(completedOrder.created_at).toLocaleString('id-ID')}</p>
-              <p>Metode: {completedOrder.payment_method.toUpperCase()}</p>
-              <hr className="my-2 border-dashed" />
-              {completedOrder.items.map((it, i) => (
-                <div key={i} className="flex justify-between">
-                  <span>{it.qty}x {it.name}</span>
-                  <span>{(it.price * it.qty).toLocaleString('id-ID')}</span>
-                </div>
-              ))}
-              <hr className="my-2 border-dashed" />
-              <div className="flex justify-between font-bold">
-                <span>TOTAL</span>
-                <span>Rp {Number(completedOrder.total_amount).toLocaleString('id-ID')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>BAYAR</span>
-                <span>Rp {Number(completedOrder.amount_paid).toLocaleString('id-ID')}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>KEMBALI</span>
-                <span>Rp {Number(completedOrder.change_amount).toLocaleString('id-ID')}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button onClick={handlePrint} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl">
-                Cetak / Download Struk
-              </button>
-              <button onClick={handleFinish} className="flex-1 py-3 bg-black text-white font-bold rounded-xl">
-                Selesai
-              </button>
-            </div>
           </div>
         )}
+
+        {/* Action Buttons */}
+        <div className="flex space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 rounded-xl font-bold text-gray-700 transition"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={handleCheckout}
+            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold disabled:opacity-50 transition"
+          >
+            {isProcessing ? 'Memproses...' : 'Selesai'}
+          </button>
+        </div>
       </div>
     </div>
   )
