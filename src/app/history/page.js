@@ -44,37 +44,46 @@ export default function HistoryPage() {
               Belum ada riwayat transaksi tercatat.
             </div>
           ) : (
-            transactions.map((t) => (
-              <div key={t.id} className="p-4 flex flex-col gap-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-extrabold text-sm text-neutral-900">#TRX-{t.id}</span>
-                    <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
-                      {t.created_at ? new Date(t.created_at).toLocaleString('id-ID') : 'Waktu tidak tercatat'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-black text-rose-600 text-base">
-                      Rp {Number(t.total_amount || 0).toLocaleString('id-ID')}
-                    </p>
-                    <span className="text-[10px] bg-green-50 text-green-600 font-bold px-2 py-0.5 rounded-full inline-block mt-1">
-                      {t.payment_method || 'CASH'}
-                    </span>
-                  </div>
-                </div>
+            transactions.map((t) => {
+              // Ambil total nilai dari total_amount atau total
+              const totalVal = t.total_amount ?? t.total ?? 0
+              // Ambil waktu transaksi dari created_at atau timestamp
+              const dateVal = t.created_at || t.created_at_time
+              // Ambil item pesanan
+              const itemList = Array.isArray(t.items) ? t.items : (typeof t.items === 'string' ? JSON.parse(t.items || '[]') : [])
 
-                {Array.isArray(t.items) && t.items.length > 0 && (
-                  <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-100 text-xs text-neutral-600 space-y-1 mt-1">
-                    {t.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between font-medium">
-                        <span>{item.name} x{item.quantity}</span>
-                        <span>Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
-                      </div>
-                    ))}
+              return (
+                <div key={t.id} className="p-4 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-extrabold text-sm text-neutral-900">#TRX-{t.id}</span>
+                      <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
+                        {dateVal ? new Date(dateVal).toLocaleString('id-ID') : 'Waktu tidak tercatat'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-rose-600 text-base">
+                        Rp {Number(totalVal).toLocaleString('id-ID')}
+                      </p>
+                      <span className="text-[10px] bg-green-50 text-green-600 font-bold px-2 py-0.5 rounded-full inline-block mt-1">
+                        {t.payment_method || 'CASH'}
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))
+
+                  {itemList.length > 0 && (
+                    <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-100 text-xs text-neutral-600 space-y-1 mt-1">
+                      {itemList.map((item, idx) => (
+                        <div key={idx} className="flex justify-between font-medium">
+                          <span>{item.name} x{item.quantity}</span>
+                          <span>Rp {((item.price || 0) * (item.quantity || 1)).toLocaleString('id-ID')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })
           )}
         </div>
       </div>
