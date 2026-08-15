@@ -1,150 +1,72 @@
 'use client'
-
 import { useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
-import useCartStore from '../store/useCartStore'
 
-export default function PaymentModal({ isOpen, onClose }) {
-  const { cart, getTotal, clearCart } = useCartStore()
-  const [paymentMethod, setPaymentMethod] = useState('Cash')
-  const [cashAmount, setCashAmount] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
+export default function PaymentModal({ isOpen, onClose, total }) {
+  const [step, setStep] = useState('method') // method, details, success
+  const [method, setMethod] = useState(null)
 
   if (!isOpen) return null
 
-  const total = getTotal()
-  const change = Number(cashAmount) - total
-
-  async function handleCheckout() {
-    if (paymentMethod === 'Cash' && change < 0) {
-      alert('Uang pembayaran kurang!')
-      return
-    }
-
-    setIsProcessing(true)
-
-    try {
-      // 1. Catat Transaksi Utama
-      const { data: transaction, error: transError } = await supabase
-        .from('transactions')
-        .insert([
-          {
-            total_amount: total,
-            payment_method: paymentMethod,
-            cash_given: paymentMethod === 'Cash' ? Number(cashAmount) : total,
-            change_given: paymentMethod === 'Cash' ? change : 0,
-          },
-        ])
-        .select()
-        .single()
-
-      if (transError) throw transError
-
-      // 2. Catat Detail Barang yang Dibeli
-      const transactionItems = cart.map((item) => ({
-        transaction_id: transaction.id,
-        product_id: item.id,
-        quantity: item.quantity,
-        price: item.price,
-      }))
-
-      const { error: itemsError } = await supabase
-        .from('transaction_items')
-        .insert(transactionItems)
-
-      if (itemsError) throw itemsError
-
-      // 3. Potong Stok Produk di Database
-      for (const item of cart) {
-        await supabase
-          .from('products')
-          .update({ stock: item.stock - item.quantity })
-          .eq('id', item.id)
-      }
-
-      alert('Transaksi Berhasil!')
-      clearCart()
-      onClose()
-      window.location.reload()
-    } catch (err) {
-      console.error(err)
-      alert('Gagal memproses transaksi: ' + err.message)
-    } finally {
-      setIsProcessing(false)
-    }
+  const handleFinish = () => {
+    setStep('success')
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-        <h3 className="text-xl font-bold mb-4 text-gray-800">Pembayaran</h3>
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-600 mb-1">Total Tagihan</label>
-          <div className="text-3xl font-bold text-blue-600">Rp {total.toLocaleString('id-ID')}</div>
-        </div>
-
-        {/* Metode Pembayaran */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-600 mb-2">Metode Pembayaran</label>
-          <div className="grid grid-cols-3 gap-2">
-            {['Cash', 'QRIS', 'Transfer'].map((method) => (
-              <button
-                key={method}
-                type="button"
-                onClick={() => setPaymentMethod(method)}
-                className={`py-2 text-sm font-semibold rounded-lg border transition ${
-                  paymentMethod === method
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                }`}
-              >
-                {method}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Input Cash */}
-        {paymentMethod === 'Cash' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-600 mb-1">Uang Diterima</label>
-            <input
-              type="number"
-              placeholder="0"
-              value={cashAmount}
-              onChange={(e) => setCashAmount(e.target.value)}
-              className="w-full border rounded-lg px-4 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {cashAmount && (
-              <div className="mt-2 text-sm">
-                Kembalian:{' '}
-                <span className={`font-bold ${change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  Rp {change.toLocaleString('id-ID')}
-                </span>
-              </div>
-            )}
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+        
+        {/* Step: Pilih Metode */}
+        {step === 'method' && (
+          <div>
+            <h2 className="text-lg font-bold mb-4">Pilih Metode Pembayaran</h2>
+            <div className="grid gap-3">
+              <button onClick={() => { setMethod('cash'); setStep('details'); }} className="p-4 border rounded-xl hover:bg-neutral-50 font-semibold">Cash</button>
+              <button onClick={() => { setMethod('qris'); setStep('details'); }} className="p-4 border rounded-xl hover:bg-neutral-50 font-semibold">QRIS</button>
+              <button onClick={() => { setMethod('transfer'); setStep('details'); }} className="p-4 border rounded-xl hover:bg-neutral-50 font-semibold">Transfer Bank</button>
+            </div>
+            <button onClick={onClose} className="w-full mt-4 text-neutral-400 text-sm">Batal</button>
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex space-x-3 mt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 rounded-xl font-bold text-gray-700 transition"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            disabled={isProcessing}
-            onClick={handleCheckout}
-            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold disabled:opacity-50 transition"
-          >
-            {isProcessing ? 'Memproses...' : 'Selesai'}
-          </button>
-        </div>
+        {/* Step: Detail Pembayaran */}
+        {step === 'details' && (
+          <div>
+            <h2 className="text-lg font-bold mb-2">Konfirmasi {method.toUpperCase()}</h2>
+            <p className="text-neutral-500 mb-6">Total Tagihan: <span className="font-bold text-rose-600">Rp {total.toLocaleString()}</span></p>
+            
+            {method === 'qris' && (
+              <div className="text-center">
+                <div className="bg-neutral-100 p-4 rounded-lg mb-4">
+                  <p className="text-sm">Scan QRIS Berikut:</p>
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" className="w-40 h-40 mx-auto" />
+                </div>
+              </div>
+            )}
+
+            {method === 'transfer' && (
+              <div className="bg-neutral-50 p-4 rounded-xl mb-4 text-sm">
+                <p>Silakan Transfer ke:</p>
+                <p className="font-bold text-lg">BCA: 1234567890</p>
+                <p className="text-neutral-500">a/n BENstation</p>
+              </div>
+            )}
+
+            <button onClick={handleFinish} className="w-full bg-rose-600 text-white font-bold py-3 rounded-xl">
+              {method === 'cash' ? 'Konfirmasi' : 'Saya Sudah Bayar'}
+            </button>
+          </div>
+        )}
+
+        {/* Step: Sukses */}
+        {step === 'success' && (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">✓</div>
+            <h2 className="text-xl font-bold mb-2">Transaksi Berhasil!</h2>
+            <p className="text-neutral-500 mb-6">Pembayaran telah diterima dengan sukses.</p>
+            <button onClick={onClose} className="w-full bg-neutral-900 text-white font-bold py-3 rounded-xl">Tutup</button>
+          </div>
+        )}
+
       </div>
     </div>
   )
