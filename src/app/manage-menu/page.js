@@ -7,6 +7,9 @@ import Link from 'next/link'
 export default function ManageMenuPage() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
+  
+  // State Form
+  const [editingId, setEditingId] = useState(null) // Menyimpan ID menu yang sedang di-edit
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('')
@@ -29,15 +32,36 @@ export default function ManageMenuPage() {
     if (prodData) setProducts(prodData)
   }
 
-  const handleAddProduct = async (e) => {
+  // Masuk ke mode Edit: Isi form dengan data menu yang dipilih
+  const handleEditClick = (product) => {
+    setEditingId(product.id)
+    setName(product.name || '')
+    setPrice(product.price || '')
+    setStock(product.stock || 0)
+    setCategory(product.category || (categories[0]?.name || ''))
+    setImageUrl(product.image_url || '')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Batal Edit / Reset Form
+  const handleCancel = () => {
+    setEditingId(null)
+    setName('')
+    setPrice('')
+    setStock('')
+    setImageUrl('')
+    if (categories.length > 0) setCategory(categories[0].name)
+  }
+
+  // Simpan (Bisa Tambah Baru atau Update yang Ada)
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!name.trim() || !price) return alert('Nama dan Harga wajib diisi')
     setLoading(true)
 
-    // Jika URL gambar kosong, biarkan null atau gambar kosong netral
     const cleanImageUrl = imageUrl.trim() ? imageUrl.trim() : null
 
-    const newProduct = {
+    const productPayload = {
       name,
       price: Number(price),
       stock: Number(stock) || 0,
@@ -45,15 +69,27 @@ export default function ManageMenuPage() {
       image_url: cleanImageUrl
     }
 
-    const { error } = await supabase.from('products').insert([newProduct])
+    let error = null
+
+    if (editingId) {
+      // UPDATE MENU YANG SUDAH ADA
+      const res = await supabase
+        .from('products')
+        .update(productPayload)
+        .eq('id', editingId)
+      error = res.error
+    } else {
+      // TAMBAH MENU BARU
+      const res = await supabase
+        .from('products')
+        .insert([productPayload])
+      error = res.error
+    }
 
     if (error) {
-      alert('Gagal menambah menu: ' + error.message)
+      alert('Gagal menyimpan menu: ' + error.message)
     } else {
-      setName('')
-      setPrice('')
-      setStock('')
-      setImageUrl('')
+      handleCancel()
       fetchData()
     }
     setLoading(false)
@@ -76,58 +112,95 @@ export default function ManageMenuPage() {
           </Link>
         </div>
 
-        <form onSubmit={handleAddProduct} className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm mb-6 space-y-4">
-          <h2 className="font-extrabold text-sm text-neutral-800">Tambah Menu Baru</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="Nama Menu (misal: Cilok Ori)..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-              required
-            />
-            <input
-              type="number"
-              placeholder="Harga (Rp)..."
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-              required
-            />
-            <input
-              type="number"
-              placeholder="Stok Awal..."
-              value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              className="border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-            />
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white"
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
-              ))}
-            </select>
+        {/* Form Tambah / Edit Menu */}
+        <form onSubmit={handleSubmit} className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm mb-6 space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="font-extrabold text-sm text-neutral-800">
+              {editingId ? '✏️ Edit Menu / Tambah Stok' : '➕ Tambah Menu Baru'}
+            </h2>
+            {editingId && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="text-xs text-neutral-400 hover:text-rose-600 font-bold"
+              >
+                Batal Edit
+              </button>
+            )}
           </div>
-          <input
-            type="url"
-            placeholder="URL Link Gambar Asli (.jpg / .png)..."
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            className="w-full border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-2.5 rounded-xl text-sm transition disabled:opacity-50"
-          >
-            {loading ? 'Menyimpan...' : 'Simpan Menu Baru'}
-          </button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-bold text-neutral-500 mb-1 block">Nama Menu</label>
+              <input
+                type="text"
+                placeholder="Nama Menu..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-neutral-500 mb-1 block">Harga (Rp)</label>
+              <input
+                type="number"
+                placeholder="Harga (Rp)..."
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-neutral-500 mb-1 block">Jumlah Stok</label>
+              <input
+                type="number"
+                placeholder="Stok..."
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
+                className="w-full border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-neutral-500 mb-1 block">Kategori</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 bg-white"
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-neutral-500 mb-1 block">URL Link Gambar</label>
+            <input
+              type="url"
+              placeholder="URL Link Gambar (.jpg / .png)..."
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              className="w-full border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full text-white font-extrabold py-2.5 rounded-xl text-sm transition disabled:opacity-50 ${
+                editingId ? 'bg-amber-600 hover:bg-amber-700' : 'bg-rose-600 hover:bg-rose-700'
+              }`}
+            >
+              {loading ? 'Menyimpan...' : (editingId ? 'Perbarui Menu Ini' : 'Simpan Menu Baru')}
+            </button>
+          </div>
         </form>
 
+        {/* Daftar Menu */}
         <div className="bg-white rounded-2xl border border-neutral-200 divide-y divide-neutral-100 shadow-sm">
           {products.length === 0 ? (
             <div className="p-6 text-center text-xs text-neutral-400 font-semibold">
@@ -146,15 +219,26 @@ export default function ManageMenuPage() {
                   )}
                   <div>
                     <h3 className="font-bold text-sm text-neutral-800">{p.name}</h3>
-                    <p className="text-xs text-rose-600 font-extrabold">Rp {p.price?.toLocaleString('id-ID')} <span className="text-neutral-400 font-normal">| Stok: {p.stock}</span></p>
+                    <p className="text-xs text-rose-600 font-extrabold">
+                      Rp {p.price?.toLocaleString('id-ID')} <span className="text-neutral-400 font-normal">| Stok: {p.stock}</span>
+                    </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="text-xs text-rose-600 font-bold bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition"
-                >
-                  Hapus
-                </button>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleEditClick(p)}
+                    className="text-xs text-amber-700 font-bold bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p.id)}
+                    className="text-xs text-rose-600 font-bold bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition"
+                  >
+                    Hapus
+                  </button>
+                </div>
               </div>
             ))
           )}
